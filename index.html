@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GhostLines</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <style>
+    body {
+      background-color: #111;
+      color: #eee;
+      font-family: monospace;
+      padding: 20px;
+    }
+    #messages {
+      max-width: 600px;
+      margin: 20px auto;
+      border-top: 1px solid #444;
+      padding-top: 10px;
+    }
+    .msg {
+      margin-bottom: 12px;
+      background: #222;
+      padding: 10px 14px;
+      border-radius: 5px;
+      position: relative;
+      overflow: hidden;
+    }
+    .timer {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-size: 0.75em;
+      color: #999;
+    }
+    input, button {
+      font-size: 1em;
+      padding: 10px;
+      width: 100%;
+      margin-top: 10px;
+      border: none;
+      border-radius: 4px;
+    }
+    button {
+      background-color: #333;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #444;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>GhostLines</h2>
+  <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
+  <button onclick="send()">Send</button>
+
+  <div id="messages"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
+      authDomain: "ghostlines-473b1.firebaseapp.com",
+      projectId: "ghostlines-473b1",
+      databaseURL: "https://ghostlines-473b1-default-rtdb.asia-southeast1.firebasedatabase.app",
+      storageBucket: "ghostlines-473b1.appspot.com",
+      messagingSenderId: "220621840510",
+      appId: "1:220621840510:web:61b318c6c35b..."
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+
+    function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      const lineRef = db.ref("lines").push();
+      const now = Date.now();
+      lineRef.set({
+        text: text,
+        timestamp: now,
+        ttl: now + 5000 // 30-second TTL
+      });
+      input.value = '';
+    }
+
+    db.ref("lines").on("child_added", snap => {
+      const data = snap.val();
+      const el = document.createElement("div");
+      el.className = "msg";
+      el.innerText = data.text;
+
+      const timer = document.createElement("div");
+      timer.className = "timer";
+      el.appendChild(timer);
+      messages.appendChild(el);
+
+      let t = 5;
+      timer.innerText = t + "s";
+
+      const countdown = setInterval(() => {
+        t--;
+        timer.innerText = t + "s";
+        if (t <= 0) {
+          clearInterval(countdown);
+          if (el.parentNode) el.remove();
+        }
+      }, 1000);
+
+      // Client-side delete after 30s, then also remove from DB
+      setTimeout(() => {
+        snap.ref.remove();
+      }, 5000);
+    });
+  </script>
+</body>
+</html>
