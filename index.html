@@ -84,7 +84,7 @@
       lineRef.set({
         text: text,
         timestamp: now,
-        ttl: now + 5000 // 30-second TTL
+        ttl: now + 10000 // 30-second TTL
       });
       input.value = '';
     }
@@ -100,7 +100,7 @@
       el.appendChild(timer);
       messages.appendChild(el);
 
-      let t = 5;
+      let t = 10;
       timer.innerText = t + "s";
 
       const countdown = setInterval(() => {
@@ -110,7 +110,7 @@
           clearInterval(countdown);
           if (el.parentNode) el.remove();
         }
-      }, 1000);
+      }, 10000);
 
       // Client-side delete after 30s, then also remove from DB
       setTimeout(() => {
