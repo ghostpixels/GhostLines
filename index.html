@@ -79,6 +79,13 @@
       color: #999;
     }
 
+    #presenceNotice {
+      text-align: center;
+      color: #0f0;
+      margin-bottom: 20px;
+      display: none;
+    }
+
     .toast {
       position: fixed;
       bottom: 20px;
@@ -97,23 +104,23 @@
 
 <div id="onboard">
   <h2>GhostLines</h2>
-  <input id="roomInput" placeholder="Enter room name (optional)">
-  <button onclick="generateRoom()">Generate Random Room</button>
+  <input id="roomInput" placeholder="Enter a room name (or leave blank)">
   <button onclick="startSession()">Start Session</button>
 </div>
 
 <div id="chat">
   <h3>GhostLines</h3>
   <div id="roomLabel"></div>
+  <div id="presenceNotice">Both users are in. Start typing your message.</div>
   <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
   <button onclick="send()">Send</button>
   <div id="messages"></div>
 </div>
 
-<div class="toast" id="toast">Room URL copied to clipboard</div>
+<div class="toast" id="toast">Room URL copied to clipboard. Share it with the other person to start the chat.</div>
 
 <script>
-  // Firebase setup
+  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
     authDomain: "ghostlines-473b1.firebaseapp.com",
@@ -132,11 +139,15 @@
   const messages = document.getElementById('messages');
   const roomLabel = document.getElementById('roomLabel');
   const toast = document.getElementById('toast');
+  const presenceNotice = document.getElementById('presenceNotice');
 
   const urlParams = new URLSearchParams(window.location.search);
   const room = urlParams.get('room');
 
   let roomRef = null;
+  let presenceRef = null;
+  let connectedRef = db.ref('.info/connected');
+  let localPresenceKey = null;
 
   if (!room) {
     onboard.style.display = 'block';
@@ -144,27 +155,23 @@
     startChat(room);
   }
 
-  function generateRoom() {
-    const words = ['void', 'hollow', 'neon', 'pulse', 'mirror', 'static', 'ghost', 'signal'];
-    const suffix = Math.floor(Math.random() * 9999);
-    document.getElementById('roomInput').value = words[Math.floor(Math.random() * words.length)] + '-' + suffix;
-  }
-
-  function startSession() {
-    const roomName = document.getElementById('roomInput').value.trim() || generateRoomName();
-    const url = `${window.location.pathname}?room=${roomName}`;
-    navigator.clipboard.writeText(window.location.origin + url);
-    window.location.href = url;
-  }
-
   function generateRoomName() {
     const words = ['phantom', 'drift', 'static', 'ember', 'pulse', 'echo'];
     return words[Math.floor(Math.random() * words.length)] + '-' + Math.floor(Math.random() * 10000);
   }
 
+  function startSession() {
+    const input = document.getElementById('roomInput');
+    const name = input.value.trim() || generateRoomName();
+    const newUrl = `${window.location.pathname}?room=${name}`;
+    navigator.clipboard.writeText(window.location.origin + newUrl);
+    showToast();
+    window.location.href = newUrl;
+  }
+
   function showToast() {
     toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
   }
 
   function startChat(roomName) {
@@ -172,6 +179,25 @@
     chat.style.display = 'block';
     roomLabel.innerText = `Room: ${roomName}`;
     roomRef = db.ref(`rooms/${roomName}/lines`);
+    presenceRef = db.ref(`rooms/${roomName}/presence`);
+
+    connectedRef.on("value", function(snap) {
+      if (snap.val() === true) {
+        localPresenceKey = presenceRef.push().key;
+        const presenceNode = presenceRef.child(localPresenceKey);
+        presenceNode.set(true);
+        presenceNode.onDisconnect().remove();
+      }
+    });
+
+    presenceRef.on("value", function(snapshot) {
+      const count = snapshot.numChildren();
+      if (count >= 2) {
+        presenceNotice.style.display = 'block';
+      } else {
+        presenceNotice.style.display = 'none';
+      }
+    });
 
     roomRef.on("child_added", snap => {
       const data = snap.val();
