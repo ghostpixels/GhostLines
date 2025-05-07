@@ -84,7 +84,7 @@
       lineRef.set({
         text: text,
         timestamp: now,
-        ttl: now + 10000 // 30-second TTL
+        ttl: now + 10000 // 10-second TTL
       });
       input.value = '';
     }
@@ -110,12 +110,12 @@
           clearInterval(countdown);
           if (el.parentNode) el.remove();
         }
-      }, 10000);
+      }, 1000);
 
-      // Client-side delete after 30s, then also remove from DB
+      // Client-side delete after 10s, then also remove from DB
       setTimeout(() => {
         snap.ref.remove();
-      }, 5000);
+      }, 10000);
     });
   </script>
 </body>
