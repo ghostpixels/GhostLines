@@ -3,58 +3,79 @@
 <head>
   <meta charset="UTF-8">
   <title>GhostLines</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     body {
       background-color: #111;
       color: #eee;
-      font-family: monospace;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', monospace;
+      padding: 10px;
+      margin: 0;
     }
+
+    h2 {
+      font-size: 20px;
+      text-align: center;
+      margin: 10px 0;
+      color: #aaa;
+    }
+
+    #input {
+      font-size: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      margin-bottom: 10px;
+      width: 100%;
+      box-sizing: border-box;
+      background-color: #222;
+      color: #eee;
+    }
+
+    button {
+      background-color: #0a84ff;
+      color: white;
+      font-size: 16px;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
     #messages {
-      max-width: 600px;
-      margin: 20px auto;
-      border-top: 1px solid #444;
-      padding-top: 10px;
+      max-width: 700px;
+      margin: 0 auto;
+      padding-bottom: 50px;
     }
+
     .msg {
-      margin-bottom: 12px;
-      background: #222;
-      padding: 10px 14px;
-      border-radius: 5px;
+      background-color: #2a2a2e;
+      margin: 12px 0;
+      padding: 14px 18px;
+      border-radius: 18px;
+      font-size: 17px;
+      line-height: 1.4;
       position: relative;
-      overflow: hidden;
+      max-width: 90%;
+      word-break: break-word;
     }
+
     .timer {
       position: absolute;
       top: 8px;
-      right: 12px;
+      right: 14px;
       font-size: 0.75em;
       color: #999;
-    }
-    input, button {
-      font-size: 1em;
-      padding: 10px;
-      width: 100%;
-      margin-top: 10px;
-      border: none;
-      border-radius: 4px;
-    }
-    button {
-      background-color: #333;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #444;
     }
   </style>
 </head>
 <body>
 
   <h2>GhostLines</h2>
-  <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
+  <input id="input" maxlength="99" placeholder="Type a line (max 99 chars)">
   <button onclick="send()">Send</button>
 
   <div id="messages"></div>
@@ -84,7 +105,7 @@
       lineRef.set({
         text: text,
         timestamp: now,
-        ttl: now + 10000 // 10-second TTL
+        ttl: now + 10000
       });
       input.value = '';
     }
@@ -112,11 +133,11 @@
         }
       }, 1000);
 
-      // Client-side delete after 10s, then also remove from DB
       setTimeout(() => {
         snap.ref.remove();
       }, 10000);
     });
   </script>
+
 </body>
 </html>
