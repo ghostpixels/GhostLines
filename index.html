@@ -79,10 +79,19 @@
       color: #999;
     }
 
-    #presenceNotice {
+    #presenceNotice, #debugStatus {
       text-align: center;
+      font-size: 14px;
+      margin: 8px 0;
       color: #0f0;
-      margin-bottom: 20px;
+      display: none;
+    }
+
+    #waitingStatus {
+      text-align: center;
+      font-size: 14px;
+      margin: 8px 0;
+      color: #999;
       display: none;
     }
 
@@ -98,6 +107,18 @@
       color: #eee;
       display: none;
     }
+
+    .flash {
+      text-align: center;
+      font-size: 13px;
+      color: #0f0;
+      animation: fadeout 1s ease-out forwards;
+    }
+
+    @keyframes fadeout {
+      0% { opacity: 1; }
+      100% { opacity: 0; height: 0; overflow: hidden; }
+    }
   </style>
 </head>
 <body>
@@ -111,9 +132,11 @@
 <div id="chat">
   <h3>GhostLines</h3>
   <div id="roomLabel"></div>
+  <div id="waitingStatus">Waiting for another user to join...</div>
   <div id="presenceNotice">Both users are in. Start typing your message.</div>
   <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
   <button onclick="send()">Send</button>
+  <div id="debugStatus"></div>
   <div id="messages"></div>
 </div>
 
@@ -140,6 +163,8 @@
   const roomLabel = document.getElementById('roomLabel');
   const toast = document.getElementById('toast');
   const presenceNotice = document.getElementById('presenceNotice');
+  const waitingStatus = document.getElementById('waitingStatus');
+  const debugStatus = document.getElementById('debugStatus');
 
   const urlParams = new URLSearchParams(window.location.search);
   const room = urlParams.get('room');
@@ -194,9 +219,12 @@
       const count = snapshot.numChildren();
       if (count >= 2) {
         presenceNotice.style.display = 'block';
+        waitingStatus.style.display = 'none';
       } else {
         presenceNotice.style.display = 'none';
+        waitingStatus.style.display = 'block';
       }
+      debugStatus.innerText = `Users present: ${count}`;
     });
 
     roomRef.on("child_added", snap => {
@@ -224,6 +252,7 @@
 
       setTimeout(() => {
         snap.ref.remove();
+        showFlash("Message expired");
       }, 10000);
     });
   }
@@ -239,6 +268,15 @@
       ttl: now + 10000
     });
     input.value = '';
+    showFlash("Message sent");
+  }
+
+  function showFlash(text) {
+    const flash = document.createElement("div");
+    flash.className = "flash";
+    flash.innerText = text;
+    document.body.appendChild(flash);
+    setTimeout(() => { flash.remove(); }, 1000);
   }
 </script>
 
