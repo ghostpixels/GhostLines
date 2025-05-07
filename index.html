@@ -8,28 +8,35 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   <style>
     body {
-      background-color: #111;
+      background: #111;
       color: #eee;
       font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', monospace;
-      padding: 10px;
       margin: 0;
+      padding: 20px;
     }
 
-    h2 {
-      font-size: 20px;
+    h2, h3 {
       text-align: center;
-      margin: 10px 0;
       color: #aaa;
     }
 
-    #input {
-      font-size: 16px;
-      padding: 14px;
-      border-radius: 10px;
-      border: none;
-      margin-bottom: 10px;
+    #onboard, #chat {
+      max-width: 700px;
+      margin: 0 auto;
+      display: none;
+    }
+
+    input, button {
       width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
       box-sizing: border-box;
+      margin-bottom: 12px;
+    }
+
+    input {
       background-color: #222;
       color: #eee;
     }
@@ -37,23 +44,17 @@
     button {
       background-color: #0a84ff;
       color: white;
-      font-size: 16px;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      width: 100%;
-      margin-bottom: 20px;
+      cursor: pointer;
     }
 
     #messages {
-      max-width: 700px;
-      margin: 0 auto;
-      padding-bottom: 50px;
+      margin-top: 20px;
+      padding-bottom: 40px;
     }
 
     .msg {
       background-color: #2a2a2e;
-      margin: 12px 0;
+      margin-bottom: 12px;
       padding: 14px 18px;
       border-radius: 18px;
       font-size: 17px;
@@ -70,47 +71,109 @@
       font-size: 0.75em;
       color: #999;
     }
+
+    #roomLabel {
+      text-align: center;
+      font-size: 14px;
+      margin-top: 10px;
+      color: #999;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #eee;
+      display: none;
+    }
   </style>
 </head>
 <body>
 
+<div id="onboard">
   <h2>GhostLines</h2>
-  <input id="input" maxlength="99" placeholder="Type a line (max 99 chars)">
+  <input id="roomInput" placeholder="Enter room name (optional)">
+  <button onclick="generateRoom()">Generate Random Room</button>
+  <button onclick="startSession()">Start Session</button>
+</div>
+
+<div id="chat">
+  <h3>GhostLines</h3>
+  <div id="roomLabel"></div>
+  <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
   <button onclick="send()">Send</button>
-
   <div id="messages"></div>
+</div>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
-      authDomain: "ghostlines-473b1.firebaseapp.com",
-      projectId: "ghostlines-473b1",
-      databaseURL: "https://ghostlines-473b1-default-rtdb.asia-southeast1.firebasedatabase.app",
-      storageBucket: "ghostlines-473b1.appspot.com",
-      messagingSenderId: "220621840510",
-      appId: "1:220621840510:web:61b318c6c35b..."
-    };
+<div class="toast" id="toast">Room URL copied to clipboard</div>
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<script>
+  // Firebase setup
+  const firebaseConfig = {
+    apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
+    authDomain: "ghostlines-473b1.firebaseapp.com",
+    projectId: "ghostlines-473b1",
+    databaseURL: "https://ghostlines-473b1-default-rtdb.asia-southeast1.firebasedatabase.app",
+    storageBucket: "ghostlines-473b1.appspot.com",
+    messagingSenderId: "220621840510",
+    appId: "1:220621840510:web:61b318c6c35b..."
+  };
 
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    function send() {
-      const text = input.value.trim();
-      if (!text) return;
-      const lineRef = db.ref("lines").push();
-      const now = Date.now();
-      lineRef.set({
-        text: text,
-        timestamp: now,
-        ttl: now + 10000
-      });
-      input.value = '';
-    }
+  const onboard = document.getElementById('onboard');
+  const chat = document.getElementById('chat');
+  const messages = document.getElementById('messages');
+  const roomLabel = document.getElementById('roomLabel');
+  const toast = document.getElementById('toast');
 
-    db.ref("lines").on("child_added", snap => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const room = urlParams.get('room');
+
+  let roomRef = null;
+
+  if (!room) {
+    onboard.style.display = 'block';
+  } else {
+    startChat(room);
+  }
+
+  function generateRoom() {
+    const words = ['void', 'hollow', 'neon', 'pulse', 'mirror', 'static', 'ghost', 'signal'];
+    const suffix = Math.floor(Math.random() * 9999);
+    document.getElementById('roomInput').value = words[Math.floor(Math.random() * words.length)] + '-' + suffix;
+  }
+
+  function startSession() {
+    const roomName = document.getElementById('roomInput').value.trim() || generateRoomName();
+    const url = `${window.location.pathname}?room=${roomName}`;
+    navigator.clipboard.writeText(window.location.origin + url);
+    window.location.href = url;
+  }
+
+  function generateRoomName() {
+    const words = ['phantom', 'drift', 'static', 'ember', 'pulse', 'echo'];
+    return words[Math.floor(Math.random() * words.length)] + '-' + Math.floor(Math.random() * 10000);
+  }
+
+  function showToast() {
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+  }
+
+  function startChat(roomName) {
+    onboard.style.display = 'none';
+    chat.style.display = 'block';
+    roomLabel.innerText = `Room: ${roomName}`;
+    roomRef = db.ref(`rooms/${roomName}/lines`);
+
+    roomRef.on("child_added", snap => {
       const data = snap.val();
       const el = document.createElement("div");
       el.className = "msg";
@@ -137,7 +200,21 @@
         snap.ref.remove();
       }, 10000);
     });
-  </script>
+  }
+
+  function send() {
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text || !roomRef) return;
+    const now = Date.now();
+    roomRef.push({
+      text: text,
+      timestamp: now,
+      ttl: now + 10000
+    });
+    input.value = '';
+  }
+</script>
 
 </body>
 </html>
