@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines</title>
+  <title>GhostLines v1.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -14,15 +14,12 @@
       margin: 0;
       padding: 20px;
     }
-    h2 {
-      text-align: center;
-      color: #aaa;
-    }
+    h2 { text-align: center; color: #aaa; }
     #onboard, #chat {
       max-width: 700px;
       margin: 0 auto;
     }
-    input, select, button {
+    input, button {
       width: 100%;
       padding: 14px;
       font-size: 16px;
@@ -31,7 +28,7 @@
       box-sizing: border-box;
       margin-bottom: 12px;
     }
-    input, select {
+    input {
       background-color: #222;
       color: #eee;
     }
@@ -95,17 +92,6 @@
 <h2>GhostLines</h2>
 <div id="onboard">
   <input id="roomInput" placeholder="Enter a room name (or leave blank)">
-  <select id="emojiPicker">
-    <option value="" disabled selected>Select your emoji</option>
-    <option>🐶</option><option>🐱</option><option>🦊</option><option>🐻</option>
-    <option>🐼</option><option>🐯</option><option>🦁</option><option>🐸</option>
-    <option>🐵</option><option>🐔</option><option>🦉</option><option>🦄</option>
-    <option>🐝</option><option>🦋</option><option>🐞</option><option>🐢</option>
-    <option>🐙</option><option>🦀</option><option>🐬</option><option>🐳</option>
-    <option>🦭</option><option>🦥</option><option>👧</option><option>👦</option>
-    <option>🧑</option><option>👩‍🦱</option><option>🧔</option><option>👨‍🦰</option>
-    <option>👩‍🦳</option>
-  </select>
   <button onclick="startSession()">Start Session</button>
 </div>
 <div id="chat" style="display:none;">
@@ -133,25 +119,71 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+
   const room = new URLSearchParams(window.location.search).get('room');
+  const passphrase = decodeURIComponent(window.location.hash.slice(1));
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
 
-  // Persist selected emoji
-  let clientEmoji = sessionStorage.getItem("ghostEmoji") || "";
+  let roomRef, presenceRef, aesKey = null;
 
-  let roomRef, presenceRef;
+  // Generate AES key from passphrase
+  async function deriveKey(pass) {
+    const salt = encoder.encode('ghostlines-static-salt');
+    const keyMaterial = await window.crypto.subtle.importKey(
+      "raw", encoder.encode(pass), {name: "PBKDF2"}, false, ["deriveKey"]
+    );
+    return await window.crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations: 100000,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      {name: "AES-GCM", length: 256},
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  async function encrypt(text) {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await window.crypto.subtle.encrypt(
+      {name: "AES-GCM", iv},
+      aesKey,
+      encoder.encode(text)
+    );
+    return {
+      iv: Array.from(iv),
+      data: Array.from(new Uint8Array(ciphertext))
+    };
+  }
+
+  async function decrypt(obj) {
+    try {
+      const iv = new Uint8Array(obj.iv);
+      const data = new Uint8Array(obj.data);
+      const plain = await window.crypto.subtle.decrypt(
+        {name: "AES-GCM", iv},
+        aesKey,
+        data
+      );
+      return decoder.decode(plain);
+    } catch (e) {
+      return "[Decryption failed]";
+    }
+  }
 
   function generateRoomName() {
-    const words = ['phantom', 'signal', 'hollow', 'pulse', 'neon', 'drift'];
+    const words = ['phantom','signal','hollow','pulse','neon','drift'];
     return words[Math.floor(Math.random()*words.length)] + '-' + Math.floor(Math.random()*10000);
   }
 
   function startSession() {
     const input = document.getElementById("roomInput");
-    const emoji = document.getElementById("emojiPicker").value;
-    if (!emoji) return alert("Please select an emoji.");
-    sessionStorage.setItem("ghostEmoji", emoji);
     const roomName = input.value.trim() || generateRoomName();
-    window.location.href = `${window.location.pathname}?room=${roomName}`;
+    window.location.href = `${window.location.pathname}?room=${roomName}#${passphrase}`;
   }
 
   function copyRoom() {
@@ -159,21 +191,24 @@
     alert("Room link copied!");
   }
 
-  if (room) {
-    if (!clientEmoji) clientEmoji = "👻"; // fallback
+  async function init() {
+    if (!room || !passphrase) return alert("Missing room or key.");
+
+    aesKey = await deriveKey(passphrase);
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
     document.getElementById("roomName").innerText = `Room: ${room}`;
-    document.getElementById("clientInfo").innerText = `You are: ${clientEmoji}`;
+    document.getElementById("clientInfo").innerText = `Encryption key: #${passphrase}`;
 
     roomRef = db.ref(`rooms/${room}/lines`);
     presenceRef = db.ref(`rooms/${room}/presence`);
+    const emoji = "🕶️";
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
       if (snap.val()) {
         const ref = presenceRef.push();
-        ref.set(clientEmoji);
+        ref.set(emoji);
         ref.onDisconnect().remove();
       }
     });
@@ -185,14 +220,15 @@
         users.length >= 2
         ? `Both users are in. Start typing your message.`
         : `Waiting for another user to join...`;
-      document.getElementById("clientInfo").innerText = `You are: ${clientEmoji} | Connected: ${users.join(" ")}`;
+      document.getElementById("clientInfo").innerText = `Connected: ${users.join(" ")}`;
     });
 
-    roomRef.on("child_added", snap => {
+    roomRef.on("child_added", async snap => {
       const data = snap.val();
       const el = document.createElement("div");
       el.className = "msg";
-      el.innerText = `${data.clientId}: ${data.text}`;
+      const decrypted = await decrypt(data);
+      el.innerText = decrypted;
 
       const timer = document.createElement("div");
       timer.className = "timer";
@@ -209,19 +245,21 @@
           el.remove();
         }
       }, 1000);
-
       setTimeout(() => snap.ref.remove(), 10000);
     });
   }
 
-  function send() {
+  async function send() {
     const input = document.getElementById("input");
     const text = input.value.trim();
-    if (text && roomRef) {
-      roomRef.push({ text, timestamp: Date.now(), clientId: clientEmoji });
+    if (text && roomRef && aesKey) {
+      const encrypted = await encrypt(text);
+      roomRef.push(encrypted);
       input.value = "";
     }
   }
+
+  init();
 </script>
 </body>
 </html>
