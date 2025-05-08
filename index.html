@@ -124,7 +124,9 @@
   const db = firebase.database();
 
   const room = new URLSearchParams(window.location.search).get('room');
-  const clientId = Math.random().toString(36).substring(2, 6); // short ID
+  const emojiList = ["🐶", "🐱", "🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐵", "🐔", "🦉", "🦄", "🐝", "🦋", "🐞", "🐢", "🐙", "🦀", "🐬", "🐳", "🦭", "🦥", "👧", "👦", "🧑", "👩‍🦱", "🧔", "👨‍🦰", "👩‍🦳"];
+  const clientEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
+
   let roomRef, presenceRef;
 
   function generateRoomName() {
@@ -147,7 +149,7 @@
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
     document.getElementById("roomName").innerText = `Room: ${room}`;
-    document.getElementById("clientInfo").innerText = `You are: ${clientId}`;
+    document.getElementById("clientInfo").innerText = `You are: ${clientEmoji}`;
 
     roomRef = db.ref(`rooms/${room}/lines`);
     presenceRef = db.ref(`rooms/${room}/presence`);
@@ -156,7 +158,7 @@
     connectedRef.on("value", function(snap) {
       if (snap.val()) {
         const ref = presenceRef.push();
-        ref.set(clientId);
+        ref.set(clientEmoji);
         ref.onDisconnect().remove();
       }
     });
@@ -168,7 +170,7 @@
         users.length >= 2
         ? `Both users are in. Start typing your message.`
         : `Waiting for another user to join...`;
-      document.getElementById("clientInfo").innerText = `You are: ${clientId} | Connected: ${users.join(", ")}`;
+      document.getElementById("clientInfo").innerText = `You are: ${clientEmoji} | Connected: ${users.join(" ")}`;
     });
 
     roomRef.on("child_added", snap => {
@@ -201,7 +203,7 @@
     const input = document.getElementById("input");
     const text = input.value.trim();
     if (text && roomRef) {
-      roomRef.push({ text, timestamp: Date.now(), clientId });
+      roomRef.push({ text, timestamp: Date.now(), clientId: clientEmoji });
       input.value = "";
     }
   }
