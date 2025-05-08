@@ -138,7 +138,6 @@
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const emojiList = ["🐶", "🐱", "🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐵", "🐔", "🦉", "🦄", "🐝", "🦋", "🐞", "🐢", "🐙", "🦀", "🐬", "🐳", "🦭", "🦥", "👧", "👦", "🧑", "👩‍🦱", "🧔", "👨‍🦰", "👩‍🦳"];
-
   let emoji = sessionStorage.getItem("ghostEmoji") || emojiList[Math.floor(Math.random() * emojiList.length)];
   sessionStorage.setItem("ghostEmoji", emoji);
 
@@ -156,22 +155,17 @@
     );
   }
 
-  async function encrypt(text) {
+  async function encryptField(text) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const payload = JSON.stringify({ text, clientId: emoji });
-    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoder.encode(payload));
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoder.encode(text));
     return { iv: Array.from(iv), data: Array.from(new Uint8Array(data)) };
   }
 
-  async function decrypt(obj) {
-    try {
-      const iv = new Uint8Array(obj.iv);
-      const data = new Uint8Array(obj.data);
-      const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
-      return JSON.parse(decoder.decode(decrypted));
-    } catch {
-      return { text: "[Decryption failed]", clientId: "❓" };
-    }
+  async function decryptField(obj) {
+    const iv = new Uint8Array(obj.iv);
+    const data = new Uint8Array(obj.data);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
+    return decoder.decode(decrypted);
   }
 
   function generateWord() {
@@ -232,10 +226,13 @@
     });
 
     roomRef.on("child_added", async snap => {
-      const data = await decrypt(snap.val());
+      const payload = snap.val();
+      const sender = await decryptField(payload.clientId);
+      const message = await decryptField(payload.text);
+
       const el = document.createElement("div");
       el.className = "msg";
-      el.innerText = `${data.clientId}: ${data.text}`;
+      el.innerText = `${sender}: ${message}`;
 
       const timer = document.createElement("div");
       timer.className = "timer";
@@ -260,8 +257,9 @@
     const input = document.getElementById("input");
     const text = input.value.trim();
     if (text && roomRef && aesKey) {
-      const encrypted = await encrypt(text);
-      roomRef.push(encrypted);
+      const encryptedMessage = await encryptField(text);
+      const encryptedId = await encryptField(emoji);
+      roomRef.push({ text: encryptedMessage, clientId: encryptedId });
       input.value = "";
     }
   }
