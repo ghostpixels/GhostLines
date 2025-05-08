@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines v1.1</title>
+  <title>GhostLines v1.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -51,6 +51,12 @@
       position: relative;
       max-width: 90%;
       word-break: break-word;
+      filter: blur(0);
+      transition: filter 0.2s;
+    }
+    .blurred {
+      filter: blur(6px);
+      cursor: pointer;
     }
     .timer {
       position: absolute;
@@ -96,6 +102,22 @@
       font-size: 14px;
       margin-bottom: 20px;
     }
+    #typingIndicator {
+      text-align: center;
+      font-size: 14px;
+      color: #999;
+      margin: 8px 0;
+    }
+    #blurToggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    #blurCheckbox {
+      margin-left: 8px;
+    }
   </style>
 </head>
 <body>
@@ -113,13 +135,18 @@
   </div>
   <div id="clientInfo"></div>
   <div id="statusText">Waiting for another user to join...</div>
-  <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
+  <div id="blurToggle">Blur messages:
+    <input type="checkbox" id="blurCheckbox" checked>
+  </div>
+  <input id="input" maxlength="99" placeholder="Type one line (99 char max)" oninput="typingNotify()">
   <button onclick="send()">Send</button>
+  <div id="typingIndicator"></div>
   <div id="messages"></div>
 </div>
 
 <script>
-  const firebaseConfig = {
+
+    const firebaseConfig = {
     apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
     authDomain: "ghostlines-473b1.firebaseapp.com",
     projectId: "ghostlines-473b1",
@@ -141,7 +168,8 @@
   let emoji = sessionStorage.getItem("ghostEmoji") || emojiList[Math.floor(Math.random() * emojiList.length)];
   sessionStorage.setItem("ghostEmoji", emoji);
 
-  let roomRef, presenceRef, aesKey = null;
+  let roomRef, presenceRef, typingRef, aesKey = null;
+  let typingTimeout = null;
 
   async function deriveKey(pass) {
     const salt = encoder.encode('ghostlines-salt');
@@ -207,13 +235,17 @@
 
     roomRef = db.ref("rooms/" + room + "/lines");
     presenceRef = db.ref("rooms/" + room + "/presence");
+    typingRef = db.ref("rooms/" + room + "/typing");
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
       if (snap.val()) {
-        const ref = presenceRef.push();
-        ref.set(emoji);
-        ref.onDisconnect().remove();
+        const presence = presenceRef.push();
+        presence.set(emoji);
+        presence.onDisconnect().remove();
+
+        const typingStatus = typingRef.child(emoji);
+        typingStatus.onDisconnect().remove();
       }
     });
 
@@ -223,6 +255,17 @@
       document.getElementById("statusText").innerText =
         users.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
       document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${users.join(" ")}`;
+      if (users.length === 0) db.ref("rooms/" + room).remove();  // auto delete on full disconnect
+    });
+
+    typingRef.on("value", function(snapshot) {
+      let active = null;
+      snapshot.forEach(child => {
+        const id = child.key;
+        const val = child.val();
+        if (id !== emoji && val === true) active = id;
+      });
+      document.getElementById("typingIndicator").innerText = active ? `${active} is typing...` : "";
     });
 
     roomRef.on("child_added", async snap => {
@@ -233,22 +276,17 @@
       const el = document.createElement("div");
       el.className = "msg";
       el.innerText = `${sender}: ${message}`;
+      el.setAttribute("data-message", el.innerText);
 
-      const timer = document.createElement("div");
-      timer.className = "timer";
-      el.appendChild(timer);
+      const blurMode = document.getElementById("blurCheckbox").checked;
+      if (blurMode) {
+        el.classList.add("blurred");
+        el.addEventListener("click", () => revealAndStart(el));
+      } else {
+        revealAndStart(el);
+      }
+
       document.getElementById("messages").appendChild(el);
-
-      let t = 10;
-      timer.innerText = t + "s";
-      const countdown = setInterval(() => {
-        t--;
-        timer.innerText = t + "s";
-        if (t <= 0) {
-          clearInterval(countdown);
-          el.remove();
-        }
-      }, 1000);
       setTimeout(() => snap.ref.remove(), 10000);
     });
   }
@@ -261,10 +299,39 @@
       const encryptedId = await encryptField(emoji);
       roomRef.push({ text: encryptedMessage, clientId: encryptedId });
       input.value = "";
+      typingRef.child(emoji).set(false);
     }
+  }
+
+  function revealAndStart(el) {
+    if (!el.classList.contains("blurred")) return;
+    el.classList.remove("blurred");
+
+    let t = 10;
+    const timer = document.createElement("div");
+    timer.className = "timer";
+    el.appendChild(timer);
+    timer.innerText = `${t}s`;
+    const countdown = setInterval(() => {
+      t--;
+      timer.innerText = `${t}s`;
+      if (t <= 0) {
+        clearInterval(countdown);
+        el.remove();
+      }
+    }, 1000);
+  }
+
+  function typingNotify() {
+    typingRef.child(emoji).set(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      typingRef.child(emoji).set(false);
+    }, 3000);
   }
 
   init();
 </script>
 </body>
 </html>
+  
