@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines v1.3.1</title>
+  <title>GhostLines v1.3.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -297,10 +297,11 @@
     presenceRef.on("value", function(snapshot) {
       const users = [];
       snapshot.forEach(child => users.push(child.val()));
+      const unique = [...new Set(users)];
       document.getElementById("statusText").innerText =
-        users.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
-      document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${users.join(" ")}`;
-      if (users.length === 0) db.ref("rooms/" + room).remove();
+        unique.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
+      document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${unique.join(" ")}`;
+      if (unique.length === 0) db.ref("rooms/" + room).remove();
     });
 
     typingRef.on("value", function(snapshot) {
