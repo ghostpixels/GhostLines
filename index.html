@@ -14,18 +14,14 @@
       margin: 0;
       padding: 20px;
     }
-
     h2, h3 {
       text-align: center;
       color: #aaa;
     }
-
     #onboard, #chat {
       max-width: 700px;
       margin: 0 auto;
-      display: none;
     }
-
     input, button {
       width: 100%;
       padding: 14px;
@@ -35,23 +31,19 @@
       box-sizing: border-box;
       margin-bottom: 12px;
     }
-
     input {
       background-color: #222;
       color: #eee;
     }
-
     button {
       background-color: #0a84ff;
       color: white;
       cursor: pointer;
     }
-
     #messages {
       margin-top: 20px;
       padding-bottom: 40px;
     }
-
     .msg {
       background-color: #2a2a2e;
       margin-bottom: 12px;
@@ -63,7 +55,6 @@
       max-width: 90%;
       word-break: break-word;
     }
-
     .timer {
       position: absolute;
       top: 8px;
@@ -71,79 +62,53 @@
       font-size: 0.75em;
       color: #999;
     }
-
-    #roomLabel {
-      text-align: center;
-      font-size: 14px;
+    #roomHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-top: 10px;
-      color: #999;
-    }
-
-    #presenceNotice, #debugStatus {
-      text-align: center;
       font-size: 14px;
-      margin: 8px 0;
-      color: #0f0;
-      display: none;
+      color: #ccc;
     }
-
-    #waitingStatus {
-      text-align: center;
-      font-size: 14px;
-      margin: 8px 0;
-      color: #999;
-      display: none;
+    #roomName {
+      font-weight: bold;
     }
-
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      padding: 12px 18px;
-      border-radius: 8px;
-      font-size: 14px;
-      color: #eee;
-      display: none;
-    }
-
-    .flash {
-      text-align: center;
+    #copyBtn {
+      background: none;
+      color: #0a84ff;
+      border: 1px solid #0a84ff;
+      padding: 5px 10px;
       font-size: 13px;
-      color: #0f0;
-      animation: fadeout 1s ease-out forwards;
+      border-radius: 6px;
+      cursor: pointer;
     }
-
-    @keyframes fadeout {
-      0% { opacity: 1; }
-      100% { opacity: 0; height: 0; overflow: hidden; }
+    #statusText {
+      text-align: center;
+      margin: 10px 0;
+      font-size: 14px;
+      color: #0f0;
     }
   </style>
 </head>
 <body>
-
+<h2>GhostLines</h2>
 <div id="onboard">
-  <h2>GhostLines</h2>
   <input id="roomInput" placeholder="Enter a room name (or leave blank)">
   <button onclick="startSession()">Start Session</button>
 </div>
-
-<div id="chat">
-  <h3>GhostLines</h3>
-  <div id="roomLabel"></div>
-  <div id="waitingStatus">Waiting for another user to join...</div>
-  <div id="presenceNotice">Both users are in. Start typing your message.</div>
+<div id="chat" style="display:none;">
+  <div id="roomHeader">
+    <div>Room: <span id="roomName"></span></div>
+    <button id="copyBtn" onclick="copyRoom()">Copy Link</button>
+  </div>
+  <div id="statusText">Waiting for another user to join...</div>
   <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
   <button onclick="send()">Send</button>
-  <div id="debugStatus"></div>
+  <div id="userCount"></div>
   <div id="messages"></div>
 </div>
 
-<div class="toast" id="toast">Room URL copied to clipboard. Share it with the other person to start the chat.</div>
-
 <script>
-  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
     authDomain: "ghostlines-473b1.firebaseapp.com",
@@ -156,75 +121,47 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-
-  const onboard = document.getElementById('onboard');
-  const chat = document.getElementById('chat');
-  const messages = document.getElementById('messages');
-  const roomLabel = document.getElementById('roomLabel');
-  const toast = document.getElementById('toast');
-  const presenceNotice = document.getElementById('presenceNotice');
-  const waitingStatus = document.getElementById('waitingStatus');
-  const debugStatus = document.getElementById('debugStatus');
-
   const urlParams = new URLSearchParams(window.location.search);
   const room = urlParams.get('room');
-
-  let roomRef = null;
-  let presenceRef = null;
-  let connectedRef = db.ref('.info/connected');
-  let localPresenceKey = null;
-
-  if (!room) {
-    onboard.style.display = 'block';
-  } else {
-    startChat(room);
-  }
+  let roomRef, presenceRef;
 
   function generateRoomName() {
-    const words = ['phantom', 'drift', 'static', 'ember', 'pulse', 'echo'];
-    return words[Math.floor(Math.random() * words.length)] + '-' + Math.floor(Math.random() * 10000);
+    const words = ['phantom','signal','hollow','pulse','neon','drift'];
+    return words[Math.floor(Math.random()*words.length)] + '-' + Math.floor(Math.random()*10000);
   }
 
   function startSession() {
-    const input = document.getElementById('roomInput');
-    const name = input.value.trim() || generateRoomName();
-    const newUrl = `${window.location.pathname}?room=${name}`;
-    navigator.clipboard.writeText(window.location.origin + newUrl);
-    showToast();
-    window.location.href = newUrl;
+    const input = document.getElementById("roomInput");
+    const roomName = input.value.trim() || generateRoomName();
+    window.location.href = `${window.location.pathname}?room=${roomName}`;
   }
 
-  function showToast() {
-    toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  function copyRoom() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    alert("Room link copied!");
   }
 
-  function startChat(roomName) {
-    onboard.style.display = 'none';
-    chat.style.display = 'block';
-    roomLabel.innerText = `Room: ${roomName}`;
-    roomRef = db.ref(`rooms/${roomName}/lines`);
-    presenceRef = db.ref(`rooms/${roomName}/presence`);
+  if (room) {
+    document.getElementById("onboard").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+    document.getElementById("roomName").innerText = room;
+    roomRef = db.ref("rooms/" + room + "/lines");
+    presenceRef = db.ref("rooms/" + room + "/presence");
 
+    const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
-      if (snap.val() === true) {
-        localPresenceKey = presenceRef.push().key;
-        const presenceNode = presenceRef.child(localPresenceKey);
-        presenceNode.set(true);
-        presenceNode.onDisconnect().remove();
+      if (snap.val()) {
+        const ref = presenceRef.push();
+        ref.set(true);
+        ref.onDisconnect().remove();
       }
     });
 
     presenceRef.on("value", function(snapshot) {
       const count = snapshot.numChildren();
-      if (count >= 2) {
-        presenceNotice.style.display = 'block';
-        waitingStatus.style.display = 'none';
-      } else {
-        presenceNotice.style.display = 'none';
-        waitingStatus.style.display = 'block';
-      }
-      debugStatus.innerText = `Users present: ${count}`;
+      document.getElementById("userCount").innerText = "Current users: " + count;
+      document.getElementById("statusText").innerText = count >= 2 ? "Both users are in. Start typing your message." : "Waiting for another user to join...";
     });
 
     roomRef.on("child_added", snap => {
@@ -236,11 +173,10 @@
       const timer = document.createElement("div");
       timer.className = "timer";
       el.appendChild(timer);
-      messages.appendChild(el);
+      document.getElementById("messages").appendChild(el);
 
       let t = 10;
       timer.innerText = t + "s";
-
       const countdown = setInterval(() => {
         t--;
         timer.innerText = t + "s";
@@ -249,36 +185,18 @@
           if (el.parentNode) el.remove();
         }
       }, 1000);
-
-      setTimeout(() => {
-        snap.ref.remove();
-        showFlash("Message expired");
-      }, 10000);
+      setTimeout(() => snap.ref.remove(), 10000);
     });
   }
 
   function send() {
-    const input = document.getElementById('input');
+    const input = document.getElementById("input");
     const text = input.value.trim();
-    if (!text || !roomRef) return;
-    const now = Date.now();
-    roomRef.push({
-      text: text,
-      timestamp: now,
-      ttl: now + 10000
-    });
-    input.value = '';
-    showFlash("Message sent");
-  }
-
-  function showFlash(text) {
-    const flash = document.createElement("div");
-    flash.className = "flash";
-    flash.innerText = text;
-    document.body.appendChild(flash);
-    setTimeout(() => { flash.remove(); }, 1000);
+    if (text && roomRef) {
+      roomRef.push({ text, timestamp: Date.now() });
+      input.value = "";
+    }
   }
 </script>
-
 </body>
 </html>
