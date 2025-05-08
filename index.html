@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines v1.3.2</title>
+  <title>GhostLines v1.3.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -213,6 +213,7 @@
 
   let roomRef, presenceRef, typingRef, aesKey = null;
   let typingTimeout = null;
+  let userId = Math.random().toString(36).substr(2, 9);
 
   async function deriveKey(pass) {
     const salt = encoder.encode('ghostlines-salt');
@@ -284,15 +285,9 @@
     presenceRef = db.ref("rooms/" + room + "/presence");
     typingRef = db.ref("rooms/" + room + "/typing");
 
-    const connectedRef = db.ref(".info/connected");
-    connectedRef.on("value", function(snap) {
-      if (snap.val()) {
-        const presence = presenceRef.push();
-        presence.set(emoji);
-        presence.onDisconnect().remove();
-        typingRef.child(emoji).onDisconnect().remove();
-      }
-    });
+    const userRef = presenceRef.child(userId);
+    userRef.set(emoji);
+    userRef.onDisconnect().remove();
 
     presenceRef.on("value", function(snapshot) {
       const users = [];
@@ -301,7 +296,6 @@
       document.getElementById("statusText").innerText =
         unique.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
       document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${unique.join(" ")}`;
-      if (unique.length === 0) db.ref("rooms/" + room).remove();
     });
 
     typingRef.on("value", function(snapshot) {
