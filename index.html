@@ -19,22 +19,15 @@
       max-width: 700px;
       margin: 0 auto;
     }
-    input, button {
+    button {
       width: 100%;
-      padding: 14px;
-      font-size: 16px;
+      padding: 16px;
+      font-size: 17px;
       border: none;
       border-radius: 8px;
-      box-sizing: border-box;
-      margin-bottom: 12px;
-    }
-    input {
-      background-color: #222;
-      color: #eee;
-    }
-    button {
       background-color: #0a84ff;
       color: white;
+      margin-bottom: 16px;
       cursor: pointer;
     }
     .msg {
@@ -86,15 +79,20 @@
       color: #888;
       margin-bottom: 10px;
     }
+    #confirmMsg {
+      text-align: center;
+      color: #0f0;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
 <h2>GhostLines</h2>
 
-<div id="onboard" style="display:none;">
-  <input id="roomInput" placeholder="Room name (or leave blank)">
-  <input id="keyInput" placeholder="Encryption key (or leave blank)">
-  <button onclick="startSession()">Start Encrypted Session</button>
+<div id="onboard">
+  <button onclick="startSession()">Start Session</button>
+  <div id="confirmMsg"></div>
 </div>
 
 <div id="chat" style="display:none;">
@@ -133,8 +131,8 @@
 
   async function deriveKey(pass) {
     const salt = encoder.encode('ghostlines-salt');
-    const keyMaterial = await window.crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveKey"]);
-    return await window.crypto.subtle.deriveKey(
+    const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return await crypto.subtle.deriveKey(
       { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
       keyMaterial,
       { name: "AES-GCM", length: 256 },
@@ -174,12 +172,12 @@
   }
 
   function startSession() {
-    const roomInput = document.getElementById("roomInput").value.trim() || generateRoomName();
-    const keyInput = document.getElementById("keyInput").value.trim() || generateKey();
-    const url = `${window.location.pathname}?room=${roomInput}#${keyInput}`;
+    const newRoom = generateRoomName();
+    const newKey = generateKey();
+    const url = `${window.location.pathname}?room=${newRoom}#${newKey}`;
     navigator.clipboard.writeText(url).then(() => {
-      alert("Room created and copied to clipboard. Share this link securely.");
-      window.location.href = url;
+      document.getElementById("confirmMsg").innerText = `Link copied. Share this to enter: ?room=${newRoom}`;
+      setTimeout(() => window.location.href = url, 1200);
     });
   }
 
@@ -189,10 +187,7 @@
   }
 
   async function init() {
-    if (!room || !passphrase) {
-      document.getElementById("onboard").style.display = "block";
-      return;
-    }
+    if (!room || !passphrase) return;
 
     aesKey = await deriveKey(passphrase);
     document.getElementById("onboard").style.display = "none";
@@ -202,7 +197,7 @@
 
     roomRef = db.ref("rooms/" + room + "/lines");
     presenceRef = db.ref("rooms/" + room + "/presence");
-    const emoji = "🕵️";
+    const emoji = "🕶️";
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
