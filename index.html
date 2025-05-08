@@ -108,15 +108,55 @@
       color: #999;
       margin: 8px 0;
     }
+
+    /* Toggle switch styling */
     #blurToggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      text-align: center;
       font-size: 14px;
       margin-bottom: 16px;
     }
-    #blurCheckbox {
-      margin-left: 8px;
+    .switchLabel {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0;
+      right: 0; bottom: 0;
+      background-color: #888;
+      transition: .4s;
+      border-radius: 22px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    .switch input:checked + .slider {
+      background-color: #0a84ff;
+    }
+    .switch input:checked + .slider:before {
+      transform: translateX(18px);
     }
   </style>
 </head>
@@ -135,8 +175,14 @@
   </div>
   <div id="clientInfo"></div>
   <div id="statusText">Waiting for another user to join...</div>
-  <div id="blurToggle">Blur messages:
-    <input type="checkbox" id="blurCheckbox" checked>
+  <div id="blurToggle">
+    <label class="switchLabel">
+      Blur messages:
+      <label class="switch">
+        <input type="checkbox" id="blurCheckbox" checked>
+        <span class="slider"></span>
+      </label>
+    </label>
   </div>
   <input id="input" maxlength="99" placeholder="Type one line (99 char max)" oninput="typingNotify()">
   <button onclick="send()">Send</button>
@@ -145,8 +191,7 @@
 </div>
 
 <script>
-
-    const firebaseConfig = {
+  const firebaseConfig = {
     apiKey: "AIzaSyBAgnkE1oaHr8zJcSZ6BkBeuZ...",
     authDomain: "ghostlines-473b1.firebaseapp.com",
     projectId: "ghostlines-473b1",
@@ -164,7 +209,7 @@
   const passphrase = decodeURIComponent(window.location.hash.slice(1));
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
-  const emojiList = ["🐶", "🐱", "🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐵", "🐔", "🦉", "🦄", "🐝", "🦋", "🐞", "🐢", "🐙", "🦀", "🐬", "🐳", "🦭", "🦥", "👧", "👦", "🧑", "👩‍🦱", "🧔", "👨‍🦰", "👩‍🦳"];
+  const emojiList = ["🐶","🐱","🦊","🐻","🐼","🐯","🦁","🐸","🐵","🐔","🦉","🦄","🐝","🦋","🐞","🐢","🐙","🦀","🐬","🐳","🦭","🦥","👧","👦","🧑","👩‍🦱","🧔","👨‍🦰","👩‍🦳"];
   let emoji = sessionStorage.getItem("ghostEmoji") || emojiList[Math.floor(Math.random() * emojiList.length)];
   sessionStorage.setItem("ghostEmoji", emoji);
 
@@ -255,7 +300,7 @@
       document.getElementById("statusText").innerText =
         users.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
       document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${users.join(" ")}`;
-      if (users.length === 0) db.ref("rooms/" + room).remove();  // auto delete on full disconnect
+      if (users.length === 0) db.ref("rooms/" + room).remove();
     });
 
     typingRef.on("value", function(snapshot) {
@@ -276,7 +321,6 @@
       const el = document.createElement("div");
       el.className = "msg";
       el.innerText = `${sender}: ${message}`;
-      el.setAttribute("data-message", el.innerText);
 
       const blurMode = document.getElementById("blurCheckbox").checked;
       if (blurMode) {
@@ -334,4 +378,3 @@
 </script>
 </body>
 </html>
-  
