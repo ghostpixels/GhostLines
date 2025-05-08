@@ -90,10 +90,13 @@
 </head>
 <body>
 <h2>GhostLines</h2>
-<div id="onboard">
-  <input id="roomInput" placeholder="Enter a room name (or leave blank)">
-  <button onclick="startSession()">Start Session</button>
+
+<div id="onboard" style="display:none;">
+  <input id="roomInput" placeholder="Room name (or leave blank)">
+  <input id="keyInput" placeholder="Encryption key (or leave blank)">
+  <button onclick="startSession()">Start Encrypted Session</button>
 </div>
+
 <div id="chat" style="display:none;">
   <div id="roomHeader">
     <span id="roomName"></span>
@@ -120,89 +123,86 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  const room = new URLSearchParams(window.location.search).get('room');
+  const urlParams = new URLSearchParams(window.location.search);
+  const room = urlParams.get('room');
   const passphrase = decodeURIComponent(window.location.hash.slice(1));
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
   let roomRef, presenceRef, aesKey = null;
 
-  // Generate AES key from passphrase
   async function deriveKey(pass) {
-    const salt = encoder.encode('ghostlines-static-salt');
-    const keyMaterial = await window.crypto.subtle.importKey(
-      "raw", encoder.encode(pass), {name: "PBKDF2"}, false, ["deriveKey"]
-    );
+    const salt = encoder.encode('ghostlines-salt');
+    const keyMaterial = await window.crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveKey"]);
     return await window.crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt,
-        iterations: 100000,
-        hash: "SHA-256"
-      },
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
       keyMaterial,
-      {name: "AES-GCM", length: 256},
+      { name: "AES-GCM", length: 256 },
       false,
       ["encrypt", "decrypt"]
     );
   }
 
   async function encrypt(text) {
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const ciphertext = await window.crypto.subtle.encrypt(
-      {name: "AES-GCM", iv},
-      aesKey,
-      encoder.encode(text)
-    );
-    return {
-      iv: Array.from(iv),
-      data: Array.from(new Uint8Array(ciphertext))
-    };
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoder.encode(text));
+    return { iv: Array.from(iv), data: Array.from(new Uint8Array(data)) };
   }
 
   async function decrypt(obj) {
     try {
       const iv = new Uint8Array(obj.iv);
       const data = new Uint8Array(obj.data);
-      const plain = await window.crypto.subtle.decrypt(
-        {name: "AES-GCM", iv},
-        aesKey,
-        data
-      );
-      return decoder.decode(plain);
-    } catch (e) {
+      const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
+      return decoder.decode(decrypted);
+    } catch {
       return "[Decryption failed]";
     }
   }
 
+  function generateWord() {
+    const words = ["phantom", "pulse", "signal", "drift", "hollow", "neon", "null", "quiet"];
+    return words[Math.floor(Math.random() * words.length)];
+  }
+
   function generateRoomName() {
-    const words = ['phantom','signal','hollow','pulse','neon','drift'];
-    return words[Math.floor(Math.random()*words.length)] + '-' + Math.floor(Math.random()*10000);
+    return generateWord() + "-" + Math.floor(Math.random() * 10000);
+  }
+
+  function generateKey() {
+    return generateWord() + generateWord();
   }
 
   function startSession() {
-    const input = document.getElementById("roomInput");
-    const roomName = input.value.trim() || generateRoomName();
-    window.location.href = `${window.location.pathname}?room=${roomName}#${passphrase}`;
+    const roomInput = document.getElementById("roomInput").value.trim() || generateRoomName();
+    const keyInput = document.getElementById("keyInput").value.trim() || generateKey();
+    const url = `${window.location.pathname}?room=${roomInput}#${keyInput}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert("Room created and copied to clipboard. Share this link securely.");
+      window.location.href = url;
+    });
   }
 
   function copyRoom() {
     navigator.clipboard.writeText(window.location.href);
-    alert("Room link copied!");
+    alert("Link copied.");
   }
 
   async function init() {
-    if (!room || !passphrase) return alert("Missing room or key.");
+    if (!room || !passphrase) {
+      document.getElementById("onboard").style.display = "block";
+      return;
+    }
 
     aesKey = await deriveKey(passphrase);
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
     document.getElementById("roomName").innerText = `Room: ${room}`;
-    document.getElementById("clientInfo").innerText = `Encryption key: #${passphrase}`;
+    document.getElementById("clientInfo").innerText = `Key: #${passphrase}`;
 
-    roomRef = db.ref(`rooms/${room}/lines`);
-    presenceRef = db.ref(`rooms/${room}/presence`);
-    const emoji = "🕶️";
+    roomRef = db.ref("rooms/" + room + "/lines");
+    presenceRef = db.ref("rooms/" + room + "/presence");
+    const emoji = "🕵️";
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
@@ -217,18 +217,15 @@
       const users = [];
       snapshot.forEach(child => users.push(child.val()));
       document.getElementById("statusText").innerText =
-        users.length >= 2
-        ? `Both users are in. Start typing your message.`
-        : `Waiting for another user to join...`;
-      document.getElementById("clientInfo").innerText = `Connected: ${users.join(" ")}`;
+        users.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
+      document.getElementById("clientInfo").innerText = `You: ${emoji} | Connected: ${users.join(" ")}`;
     });
 
     roomRef.on("child_added", async snap => {
       const data = snap.val();
       const el = document.createElement("div");
       el.className = "msg";
-      const decrypted = await decrypt(data);
-      el.innerText = decrypted;
+      el.innerText = await decrypt(data);
 
       const timer = document.createElement("div");
       timer.className = "timer";
