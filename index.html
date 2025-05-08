@@ -259,10 +259,10 @@
   function startSession() {
     const newRoom = generateRoomName();
     const newKey = generateKey();
-    const url = `${window.location.pathname}?room=${newRoom}#${newKey}`;
-    navigator.clipboard.writeText(url).then(() => {
+    const fullURL = `${window.location.pathname}?room=${newRoom}#${newKey}`;
+    navigator.clipboard.writeText(fullURL).then(() => {
       document.getElementById("confirmMsg").innerText = "Session link copied. Send it to someone.";
-      setTimeout(() => window.location.href = url, 1200);
+      window.location.href = fullURL;
     });
   }
 
