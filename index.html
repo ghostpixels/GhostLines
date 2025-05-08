@@ -14,7 +14,7 @@
       margin: 0;
       padding: 20px;
     }
-    h2, h3 {
+    h2 {
       text-align: center;
       color: #aaa;
     }
@@ -40,10 +40,6 @@
       color: white;
       cursor: pointer;
     }
-    #messages {
-      margin-top: 20px;
-      padding-bottom: 40px;
-    }
     .msg {
       background-color: #2a2a2e;
       margin-bottom: 12px;
@@ -63,15 +59,14 @@
       color: #999;
     }
     #roomHeader {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      margin-top: 10px;
-      font-size: 14px;
-      color: #ccc;
+      text-align: center;
+      margin: 12px 0;
     }
     #roomName {
       font-weight: bold;
+      display: block;
+      font-size: 16px;
+      margin-bottom: 6px;
     }
     #copyBtn {
       background: none;
@@ -88,6 +83,12 @@
       font-size: 14px;
       color: #0f0;
     }
+    #clientInfo {
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -98,13 +99,13 @@
 </div>
 <div id="chat" style="display:none;">
   <div id="roomHeader">
-    <div style="margin-bottom: 6px;">Room: <span id="roomName"></span></div>
+    <span id="roomName"></span>
     <button id="copyBtn" onclick="copyRoom()">Copy Link</button>
   </div>
+  <div id="clientInfo"></div>
   <div id="statusText">Waiting for another user to join...</div>
   <input id="input" maxlength="99" placeholder="Type one line (99 char max)">
   <button onclick="send()">Send</button>
-  <div id="userCount"></div>
   <div id="messages"></div>
 </div>
 
@@ -121,12 +122,13 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-  const urlParams = new URLSearchParams(window.location.search);
-  const room = urlParams.get('room');
+
+  const room = new URLSearchParams(window.location.search).get('room');
+  const clientId = Math.random().toString(36).substring(2, 6); // short ID
   let roomRef, presenceRef;
 
   function generateRoomName() {
-    const words = ['phantom','signal','hollow','pulse','neon','drift'];
+    const words = ['phantom', 'signal', 'hollow', 'pulse', 'neon', 'drift'];
     return words[Math.floor(Math.random()*words.length)] + '-' + Math.floor(Math.random()*10000);
   }
 
@@ -137,38 +139,43 @@
   }
 
   function copyRoom() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(window.location.href);
     alert("Room link copied!");
   }
 
   if (room) {
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
-    document.getElementById("roomName").innerText = room;
-    roomRef = db.ref("rooms/" + room + "/lines");
-    presenceRef = db.ref("rooms/" + room + "/presence");
+    document.getElementById("roomName").innerText = `Room: ${room}`;
+    document.getElementById("clientInfo").innerText = `You are: ${clientId}`;
+
+    roomRef = db.ref(`rooms/${room}/lines`);
+    presenceRef = db.ref(`rooms/${room}/presence`);
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
       if (snap.val()) {
         const ref = presenceRef.push();
-        ref.set(true);
+        ref.set(clientId);
         ref.onDisconnect().remove();
       }
     });
 
     presenceRef.on("value", function(snapshot) {
-      const count = snapshot.numChildren();
-      document.getElementById("userCount").innerText = "Current users: " + count;
-      document.getElementById("statusText").innerText = count >= 2 ? "Both users are in. Start typing your message." : "Waiting for another user to join...";
+      const users = [];
+      snapshot.forEach(child => users.push(child.val()));
+      document.getElementById("statusText").innerText =
+        users.length >= 2
+        ? `Both users are in. Start typing your message.`
+        : `Waiting for another user to join...`;
+      document.getElementById("clientInfo").innerText = `You are: ${clientId} | Connected: ${users.join(", ")}`;
     });
 
     roomRef.on("child_added", snap => {
       const data = snap.val();
       const el = document.createElement("div");
       el.className = "msg";
-      el.innerText = data.text;
+      el.innerText = `${data.clientId}: ${data.text}`;
 
       const timer = document.createElement("div");
       timer.className = "timer";
@@ -182,9 +189,10 @@
         timer.innerText = t + "s";
         if (t <= 0) {
           clearInterval(countdown);
-          if (el.parentNode) el.remove();
+          el.remove();
         }
       }, 1000);
+
       setTimeout(() => snap.ref.remove(), 10000);
     });
   }
@@ -193,7 +201,7 @@
     const input = document.getElementById("input");
     const text = input.value.trim();
     if (text && roomRef) {
-      roomRef.push({ text, timestamp: Date.now() });
+      roomRef.push({ text, timestamp: Date.now(), clientId });
       input.value = "";
     }
   }
