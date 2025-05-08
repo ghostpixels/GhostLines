@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines v1.2</title>
+  <title>GhostLines v1.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -235,8 +235,12 @@
   async function decryptField(obj) {
     const iv = new Uint8Array(obj.iv);
     const data = new Uint8Array(obj.data);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
-    return decoder.decode(decrypted);
+    try {
+      const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
+      return decoder.decode(decrypted);
+    } catch (e) {
+      return null;
+    }
   }
 
   function generateWord() {
@@ -286,8 +290,7 @@
         const presence = presenceRef.push();
         presence.set(emoji);
         presence.onDisconnect().remove();
-        const typingStatus = typingRef.child(emoji);
-        typingStatus.onDisconnect().remove();
+        typingRef.child(emoji).onDisconnect().remove();
       }
     });
 
@@ -317,15 +320,20 @@
 
       const el = document.createElement("div");
       el.className = "msg";
-      el.innerText = `${sender}: ${message}`;
-      document.getElementById("messages").appendChild(el);
+
+      if (sender && message) {
+        el.innerText = `${sender}: ${message}`;
+      } else {
+        el.innerText = `[Message could not be decrypted]`;
+      }
 
       const blurMode = document.getElementById("blurCheckbox").checked;
-      let hasStarted = false;
+      document.getElementById("messages").appendChild(el);
 
+      let started = false;
       function startTimer() {
-        if (hasStarted) return;
-        hasStarted = true;
+        if (started) return;
+        started = true;
         let t = 10;
         const timer = document.createElement("div");
         timer.className = "timer";
@@ -341,17 +349,17 @@
         }, 1000);
       }
 
-      if (blurMode) {
+      if (blurMode && sender && message) {
         el.classList.add("blurred");
         el.addEventListener("click", () => {
           el.classList.remove("blurred");
           startTimer();
         });
-        setTimeout(() => snap.ref.remove(), 10000);
       } else {
         startTimer();
-        setTimeout(() => snap.ref.remove(), 10000);
       }
+
+      setTimeout(() => snap.ref.remove(), 10000);
     });
   }
 
