@@ -22,7 +22,7 @@
       max-width: 700px;
       margin: 0 auto;
     }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 14px;
       font-size: 16px;
@@ -31,7 +31,7 @@
       box-sizing: border-box;
       margin-bottom: 12px;
     }
-    input {
+    input, select {
       background-color: #222;
       color: #eee;
     }
@@ -95,6 +95,17 @@
 <h2>GhostLines</h2>
 <div id="onboard">
   <input id="roomInput" placeholder="Enter a room name (or leave blank)">
+  <select id="emojiPicker">
+    <option value="" disabled selected>Select your emoji</option>
+    <option>🐶</option><option>🐱</option><option>🦊</option><option>🐻</option>
+    <option>🐼</option><option>🐯</option><option>🦁</option><option>🐸</option>
+    <option>🐵</option><option>🐔</option><option>🦉</option><option>🦄</option>
+    <option>🐝</option><option>🦋</option><option>🐞</option><option>🐢</option>
+    <option>🐙</option><option>🦀</option><option>🐬</option><option>🐳</option>
+    <option>🦭</option><option>🦥</option><option>👧</option><option>👦</option>
+    <option>🧑</option><option>👩‍🦱</option><option>🧔</option><option>👨‍🦰</option>
+    <option>👩‍🦳</option>
+  </select>
   <button onclick="startSession()">Start Session</button>
 </div>
 <div id="chat" style="display:none;">
@@ -122,10 +133,10 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-
   const room = new URLSearchParams(window.location.search).get('room');
-  const emojiList = ["🐶", "🐱", "🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐵", "🐔", "🦉", "🦄", "🐝", "🦋", "🐞", "🐢", "🐙", "🦀", "🐬", "🐳", "🦭", "🦥", "👧", "👦", "🧑", "👩‍🦱", "🧔", "👨‍🦰", "👩‍🦳"];
-  const clientEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
+
+  // Persist selected emoji
+  let clientEmoji = sessionStorage.getItem("ghostEmoji") || "";
 
   let roomRef, presenceRef;
 
@@ -136,6 +147,9 @@
 
   function startSession() {
     const input = document.getElementById("roomInput");
+    const emoji = document.getElementById("emojiPicker").value;
+    if (!emoji) return alert("Please select an emoji.");
+    sessionStorage.setItem("ghostEmoji", emoji);
     const roomName = input.value.trim() || generateRoomName();
     window.location.href = `${window.location.pathname}?room=${roomName}`;
   }
@@ -146,6 +160,7 @@
   }
 
   if (room) {
+    if (!clientEmoji) clientEmoji = "👻"; // fallback
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
     document.getElementById("roomName").innerText = `Room: ${room}`;
