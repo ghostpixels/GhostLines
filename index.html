@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>GhostLines v1.3</title>
+  <title>GhostLines v1.3.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -259,7 +259,7 @@
   function startSession() {
     const newRoom = generateRoomName();
     const newKey = generateKey();
-    const fullURL = `${window.location.pathname}?room=${newRoom}#${newKey}`;
+    const fullURL = `${window.location.origin}${window.location.pathname}?room=${newRoom}#${newKey}`;
     navigator.clipboard.writeText(fullURL).then(() => {
       document.getElementById("confirmMsg").innerText = "Session link copied. Send it to someone.";
       window.location.href = fullURL;
