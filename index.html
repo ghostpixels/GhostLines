@@ -137,6 +137,10 @@
   const passphrase = decodeURIComponent(window.location.hash.slice(1));
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  const emojiList = ["🐶", "🐱", "🦊", "🐻", "🐼", "🐯", "🦁", "🐸", "🐵", "🐔", "🦉", "🦄", "🐝", "🦋", "🐞", "🐢", "🐙", "🦀", "🐬", "🐳", "🦭", "🦥", "👧", "👦", "🧑", "👩‍🦱", "🧔", "👨‍🦰", "👩‍🦳"];
+
+  let emoji = sessionStorage.getItem("ghostEmoji") || emojiList[Math.floor(Math.random() * emojiList.length)];
+  sessionStorage.setItem("ghostEmoji", emoji);
 
   let roomRef, presenceRef, aesKey = null;
 
@@ -154,7 +158,8 @@
 
   async function encrypt(text) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoder.encode(text));
+    const payload = JSON.stringify({ text, clientId: emoji });
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoder.encode(payload));
     return { iv: Array.from(iv), data: Array.from(new Uint8Array(data)) };
   }
 
@@ -163,9 +168,9 @@
       const iv = new Uint8Array(obj.iv);
       const data = new Uint8Array(obj.data);
       const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, data);
-      return decoder.decode(decrypted);
+      return JSON.parse(decoder.decode(decrypted));
     } catch {
-      return "[Decryption failed]";
+      return { text: "[Decryption failed]", clientId: "❓" };
     }
   }
 
@@ -204,11 +209,10 @@
     document.getElementById("onboard").style.display = "none";
     document.getElementById("chat").style.display = "block";
     document.getElementById("roomName").innerText = `Room: ${room}`;
-    document.getElementById("clientInfo").innerText = `Key: #${passphrase}`;
+    document.getElementById("clientInfo").innerText = `You are: ${emoji}`;
 
     roomRef = db.ref("rooms/" + room + "/lines");
     presenceRef = db.ref("rooms/" + room + "/presence");
-    const emoji = "🕶️";
 
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", function(snap) {
@@ -224,14 +228,14 @@
       snapshot.forEach(child => users.push(child.val()));
       document.getElementById("statusText").innerText =
         users.length >= 2 ? "Both users are in. Start typing." : "Waiting for another user...";
-      document.getElementById("clientInfo").innerText = `You: ${emoji} | Connected: ${users.join(" ")}`;
+      document.getElementById("clientInfo").innerText = `You are: ${emoji} | Connected: ${users.join(" ")}`;
     });
 
     roomRef.on("child_added", async snap => {
-      const data = snap.val();
+      const data = await decrypt(snap.val());
       const el = document.createElement("div");
       el.className = "msg";
-      el.innerText = await decrypt(data);
+      el.innerText = `${data.clientId}: ${data.text}`;
 
       const timer = document.createElement("div");
       timer.className = "timer";
